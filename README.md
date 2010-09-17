@@ -7,6 +7,20 @@ PHPMailUnit implements under the covers a basic SMTP server and instead of
 delivering the email it logs it in a file. This file is then accessed by PHPMailUnit
 to provide every data of the email which you can assert in your unit tests.
 
+# Using PHPMailUnit
+
+Quite easy indeed.
+
+1. Be sure to add PHPMailUnit directory to the `include_path`. Then in your test...
+
+2. Call `PHPMailUnit::setUp();`
+
+3. Send an email with following smtp server settings: `localhost:3535`
+n
+4. Retrieve the email sent using `PHPMailUnit::getLastMail();`
+
+5. Call `PHPMailUnit::tearDown();` to stop the internal smtp server
+
 # How to contribute
 
 I did this project mainly to fit my own needs it can certainly be improved. If
