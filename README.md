@@ -13,10 +13,10 @@ Quite easy indeed.
 
 1. Be sure to add PHPMailUnit directory to the `include_path`. Then in your test...
 
-2. Call `PHPMailUnit::setUp();`
+2. Call `PHPMailUnit::setUp();`. This will start the smtp server.
 
 3. Send an email with following smtp server settings: `localhost:3535`
-n
+
 4. Retrieve the email sent using `PHPMailUnit::getLastMail();`
 
 5. Call `PHPMailUnit::tearDown();` to stop the internal smtp server
