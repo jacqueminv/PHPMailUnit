@@ -96,8 +96,8 @@ class DataCommand extends Command {
 
     public function process(PHPUnitMail $PHPUnitMail, $command) {
         if($PHPUnitMail->data_processing) {
-            if(($pos = strpos($command, "Subject:")) !== false) {
-                $PHPUnitMail->subject = substr($command, $pos + strlen("Subject:"));
+            if(($pos = strpos($command, "Subject: ")) !== false) {
+                $PHPUnitMail->subject = substr($command, $pos + strlen("Subject: "));
                 if(DEBUG) {
                     echo sprintf("Matched subject: %s%s", substr($command, $pos), CRLF);
                 }
