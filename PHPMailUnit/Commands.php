@@ -1,5 +1,18 @@
 <?php
 
+/**
+ * A minimum implementation must contain these SMTP "verbs":
+ *
+ *   HELO
+ *   MAIL
+ *   RCPT
+ *   DATA
+ *   RSET
+ *   NOOP
+ *   QUIT
+ *
+ */
+
 function data($line) {
     $data = trim($line);
     $results = explode(" ", $data, 2);
@@ -8,13 +21,13 @@ function data($line) {
 
 abstract class Command {
 
-   abstract public function process(PHPUnitMail $PHPUnitMail, $command);
+   abstract public function process(PHPUnitMail $mail, $command);
 
 }
 
 class HeloCommand extends Command {
     
-    public function process(PHPUnitMail $PHPUnitMail, $command) {
+    public function process(PHPUnitMail $mail, $command) {
         $command = data($command);
         if($command[0] == "HELO") {
             if(count($command) == 1) {
@@ -30,7 +43,7 @@ class HeloCommand extends Command {
 
 class EhloCommand extends Command {
 
-    public function process(PHPUnitMail $PHPUnitMail, $command) {
+    public function process(PHPUnitMail $mail, $command) {
         $command = data($command);
         if($command[0] == "EHLO") {
             return "502 Command not implemented" . CRLF;
@@ -42,7 +55,7 @@ class EhloCommand extends Command {
 
 class MailCommand extends Command {
 
-    public function process(PHPUnitMail $PHPUnitMail, $command) {
+    public function process(PHPUnitMail $mail, $command) {
         $command = data($command);
         if($command[0] == "MAIL") {
             $matched = preg_match("/<(.*)>/", $command[1], $from);
@@ -53,7 +66,7 @@ class MailCommand extends Command {
                 return "503 Bad request (sender not well set)" . CRLF;
             }
 
-            $PHPUnitMail->from = $from;
+            $mail->from = $from;
 
             if(DEBUG) {
                 echo sprintf("Matched FROM address: %s%s", $from, CRLF);
@@ -68,19 +81,23 @@ class MailCommand extends Command {
 
 class RCPTCommand extends Command {
 
-    public function process(PHPUnitMail $PHPUnitMail, $command) {
+    public function process(PHPUnitMail $mail, $command) {
         $command = data($command);
         if($command[0] == "RCPT") {
             if(preg_match("/(.*):<(.*)>/", $command[1], $rcpt) == 1) {
                 if(strtoupper($rcpt[1]) == "TO") {
-                        $PHPUnitMail->to[] = $rcpt[2];
+                        $mail->to[] = $rcpt[2];
 
-			if(DEBUG) {
-			    echo sprintf("Matched recipient address: %s - %s%s", $rcpt[1], $rcpt[2], CRLF);
-			}
+                    if(DEBUG) {
+                        echo sprintf("Matched recipient address: %s - %s%s"
+                                    , $rcpt[1]
+                                    , $rcpt[2]
+                                    , CRLF);
+                    }
 
-			return "250 OK" . CRLF;
-		}
+                    return "250 OK" . CRLF;
+                }
+                
             } else {
 
                 return "503 Bad request" . CRLF;
@@ -94,42 +111,60 @@ class RCPTCommand extends Command {
 
 class DataCommand extends Command {
 
-    public function process(PHPUnitMail $PHPUnitMail, $command) {
-        if($PHPUnitMail->data_processing) {
+    const ENDING = ".";
+
+    public function process(PHPUnitMail $mail, $command) {
+        if($mail->data_processing) {
+
             if(($pos = strpos($command, "Subject: ")) !== false) {
-                $PHPUnitMail->subject = substr($command, $pos + strlen("Subject: "));
+
+                //strangely, it appears that the first carriage return is not
+                //always correctly caught
+                $mail->subject = substr($command, ($pos + strlen("Subject: "))
+                                        , (strpos($command, "\n", $pos) - $pos));
+                if(strpos($mail->subject, "\n") !== false) {
+                    $mail->subject = substr($mail->subject
+                                            , 0
+                                            , (strpos($mail->subject, "\n")));
+                }
+
                 if(DEBUG) {
-                    echo sprintf("Matched subject: %s%s", substr($command, $pos), CRLF);
+                    echo sprintf("Matched subject: [%s]%s", $mail->subject, CRLF);
                 }
-            } elseif(!$PHPUnitMail->data_body_processing && strlen($command) == 0) {
-                if(DEBUG) {
-                    echo "Body processing started" . CRLF;
-                }
-                $PHPUnitMail->data_body_processing = true;
-            } elseif($PHPUnitMail->data_body_processing) {
-                if($command == ".") {
-                    $PHPUnitMail->data_body_processing = false;
-                    if(DEBUG) {
-                        echo "Body processing ended" . CRLF;
-                    }
-                } else {
-                    $PHPUnitMail->content .= $command . CRLF;
-                }
-            } else {
-                $PHPUnitMail->content = substr($PHPUnitMail->content, 0, strlen($PHPUnitMail->content) - 2);
+            }
+
+            $mail->content .= $command;
+
+            if(strrpos($command, self::ENDING)
+                === (strlen($command) - strlen(self::ENDING))) {
+
+                $mail->content = substr($mail->content
+                                        , 0
+                                        , strlen($mail->content) - strlen(self::ENDING));
+
                 return "250 OK" . CRLF;
             }
 
         } else {
             $command = data($command);
             if($command[0] == "DATA") {
-                $PHPUnitMail->data_processing = true;
+                $mail->data_processing = true;
                 return "354 Start mail input; end with <CRLF>.<CRLF>" . CRLF;
             }
         }
         
         return "";
     }
-    
 }
-?>
+
+class RSETCommand extends Command {
+
+    public function  process(PHPUnitMail $mail, $command) {
+        $command = data($command);
+        if($command[0] == "RSET") {
+            $mail->reset();
+        }
+        return "";
+    }
+
+}
